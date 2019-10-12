@@ -3,11 +3,9 @@ package com.github.pfrank13.reactiveredis.user;
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
 import com.github.tomakehurst.wiremock.junit.WireMockRule;
 import com.github.tomakehurst.wiremock.matching.EqualToJsonPattern;
-import com.sun.jna.platform.win32.OaIdl;
 
 import org.assertj.core.api.Assertions;
 import org.junit.ClassRule;
-import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.slf4j.Logger;
@@ -25,10 +23,6 @@ import org.springframework.test.context.support.TestPropertySourceUtils;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
 
-import java.time.Duration;
-import java.time.temporal.ChronoUnit;
-import java.time.temporal.TemporalUnit;
-
 
 /**
  * @author pfrank
@@ -40,18 +34,19 @@ public class UserControllerTest {
   private static final Logger LOG = LoggerFactory.getLogger(UserControllerTest.class);
 
   @ClassRule
-  public static GenericContainer redis = new GenericContainer("redis:5.0.5").withExposedPorts(6379).waitingFor(
-      Wait.forLogMessage(".*Ready to accept connections.*\\n", 1));
+  public static GenericContainer redis = new GenericContainer("redis:5.0.5") //Docker image name
+      .withExposedPorts(6379) //The container definition I believe doesn't do this automatically, it expects it from a user, this is EXPOSE 6379 in the container def NOT the exposed port to the host
+      .waitingFor(Wait.forLogMessage(".*Ready to accept connections.*\\n", 1)); //Just waiting to make sure I can see what port it bound too
 
   @ClassRule
-  public static WireMockRule wireMockRule = new WireMockRule();
+  public static WireMockRule wireMockRule = new WireMockRule(); //Wiremock on a random port
 
 
   @Autowired
   private TestRestTemplate testRestTemplate;
 
   @LocalServerPort
-  private int port;
+  private int port; //Where did our Application start listening on
 
   @Test
   public void testUpdateUser() throws Exception {
@@ -66,8 +61,6 @@ public class UserControllerTest {
 
     final User user = testRestTemplate.getForObject("http://localhost:" + port + "/user/" + expected.getId(), User.class);
     Assertions.assertThat(user).isEqualToComparingFieldByField(expected);
-
-    LOG.info("####################### Assertions Done #######################");
   }
 
   public static class RandomPortInitailizer
@@ -76,7 +69,8 @@ public class UserControllerTest {
     @Override
     public void initialize(ConfigurableApplicationContext applicationContext) {
       TestPropertySourceUtils.addInlinedPropertiesToEnvironment(applicationContext,
-                                                                "spring.redis.port=" + redis.getFirstMappedPort(), "wiremock.port=" + wireMockRule.port());
+                                                                "spring.redis.port=" + redis.getFirstMappedPort(), //Tells Spring Data Redis where to hit
+                                                                "wiremock.port=" + wireMockRule.port()); //Tells my internal client where wiremock is listening
     }
 
   }

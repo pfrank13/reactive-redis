@@ -28,6 +28,7 @@ public class UserConfiguration {
   }
 
   @Bean
+  //I don't believe this is idiomatic but maybe it is, seems very verbose for config given it's tied to User but maybe you can use <String, ?> dunno
   public ReactiveRedisOperations<String, User> userRedisOperations(ReactiveRedisConnectionFactory factory) {
     final Jackson2JsonRedisSerializer<User> serializer = new Jackson2JsonRedisSerializer<>(User.class);
 
