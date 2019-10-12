@@ -6,15 +6,22 @@ import com.github.tomakehurst.wiremock.matching.EqualToJsonPattern;
 import com.sun.jna.platform.win32.OaIdl;
 
 import org.assertj.core.api.Assertions;
+import org.junit.ClassRule;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.web.server.LocalServerPort;
+import org.springframework.context.ApplicationContextInitializer;
+import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringRunner;
+import org.springframework.test.context.support.TestPropertySourceUtils;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
 
@@ -28,13 +35,16 @@ import java.time.temporal.TemporalUnit;
  */
 @RunWith(SpringRunner.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@ContextConfiguration(initializers = {UserControllerTest.RandomPortInitailizer.class})
 public class UserControllerTest {
-  @Rule
-  public GenericContainer redis = new GenericContainer("redis:5.0.5").waitingFor(
+  private static final Logger LOG = LoggerFactory.getLogger(UserControllerTest.class);
+
+  @ClassRule
+  public static GenericContainer redis = new GenericContainer("redis:5.0.5").withExposedPorts(6379).waitingFor(
       Wait.forLogMessage(".*Ready to accept connections.*\\n", 1));
 
-  @Rule
-  public WireMockRule wireMockRule = new WireMockRule(8081);
+  @ClassRule
+  public static WireMockRule wireMockRule = new WireMockRule();
 
 
   @Autowired
@@ -53,8 +63,21 @@ public class UserControllerTest {
                         .withBody("{\"id\":112,\"name\":\"myUser\"}")));
 
     testRestTemplate.put("http://localhost:" + port + "/user", expected);
-    final User user = testRestTemplate.getForObject("http://localhost:" + port + "/user/" + expected.getId(), User.class);
 
+    final User user = testRestTemplate.getForObject("http://localhost:" + port + "/user/" + expected.getId(), User.class);
     Assertions.assertThat(user).isEqualToComparingFieldByField(expected);
+
+    LOG.info("####################### Assertions Done #######################");
+  }
+
+  public static class RandomPortInitailizer
+      implements ApplicationContextInitializer<ConfigurableApplicationContext> {
+
+    @Override
+    public void initialize(ConfigurableApplicationContext applicationContext) {
+      TestPropertySourceUtils.addInlinedPropertiesToEnvironment(applicationContext,
+                                                                "spring.redis.port=" + redis.getFirstMappedPort(), "wiremock.port=" + wireMockRule.port());
+    }
+
   }
 }

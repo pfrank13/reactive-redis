@@ -1,5 +1,7 @@
 package com.github.pfrank13.reactiveredis.user;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.Assert;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -16,6 +18,7 @@ import reactor.core.publisher.Mono;
  */
 @RestController
 public class UserController {
+  private static final Logger LOG = LoggerFactory.getLogger(UserController.class);
   private final UserRepository userRepository;
   private final WebClient userWebClient;
 
@@ -38,18 +41,15 @@ public class UserController {
   }
 
   @PutMapping(path = "/user")
-  public Mono<User> updateUser(@RequestBody final Mono<User> requestUserMono){
+  public Mono<Void> updateUser(@RequestBody final Mono<User> requestUserMono){
     return userWebClient.put()
         .body(requestUserMono, User.class)
         .exchange()
         .flatMap(clientResponse -> clientResponse.bodyToMono(User.class))
         .flatMap(userRepository::save)
-        .flatMap(success -> {
-          if(success){
-            return requestUserMono;
-          }else{
-            throw new RuntimeException("Error");
-          }
-        });
+        .doOnError(t -> {
+          LOG.error("Error", t);
+        }).then();
+
   }
 }
